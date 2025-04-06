@@ -1,4 +1,6 @@
 # Diffusion-Based Audio Inpainting
+This is a class project for ECE661.
+
 
 Official repository of the paper:
 > E. Moliner and V. Välimäki,, "Diffusion-Based Audio Inpainting",  Journal of the Audio Engineering Society, March 2024
