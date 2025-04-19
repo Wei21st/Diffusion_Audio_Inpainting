@@ -189,6 +189,7 @@ exp:
   max_grad_norm: 1
   restore: false
   checkpoint_id: null
+  total_iters: 500
   augmentations:
     rev_polarity: true
     pitch_shift:
