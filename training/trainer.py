@@ -26,24 +26,50 @@ class DiffusionLightningModule(L.LightningModule):
         loss = error.mean()
 
         self.log("train_loss_step", loss.item(), on_step=True, on_epoch=False, prog_bar=True)
+        # print('train_loss_step: ', loss.item())
+        current_lr = self.trainer.optimizers[0].param_groups[0]["lr"]
+        self.log("lr", current_lr, on_step=True, on_epoch=False, prog_bar=False)
         return loss
 
+    # def configure_optimizers(self):
+    #     optimizer = torch.optim.Adam(
+    #         self.network.parameters(),
+    #         lr=self.args.exp.lr,
+    #         betas=(self.args.exp.optimizer.beta1, self.args.exp.optimizer.beta2),
+    #         eps=self.args.exp.optimizer.eps
+    #     )
+
+    #     if hasattr(self.args.exp, 'lr_scheduler') and self.args.exp.lr_scheduler:
+    #         scheduler = torch.optim.lr_scheduler.LambdaLR(
+    #             optimizer,
+    #             lr_lambda=lambda step: min(step / max(self.args.exp.lr_rampup_it, 1e-8), 1.0)
+    #         )
+    #         return [optimizer], [scheduler]
+
+    #     return optimizer
+
     def configure_optimizers(self):
-        optimizer = torch.optim.Adam(
-            self.network.parameters(),
-            lr=self.args.exp.lr,
-            betas=(self.args.exp.optimizer.beta1, self.args.exp.optimizer.beta2),
-            eps=self.args.exp.optimizer.eps
-        )
+      optimizer = torch.optim.Adam(
+          self.network.parameters(),
+          lr=self.args.exp.lr,
+          betas=(self.args.exp.optimizer.beta1, self.args.exp.optimizer.beta2),
+          eps=self.args.exp.optimizer.eps
+      )
 
-        if hasattr(self.args.exp, 'lr_scheduler') and self.args.exp.lr_scheduler:
-            scheduler = torch.optim.lr_scheduler.LambdaLR(
-                optimizer,
-                lr_lambda=lambda step: min(step / max(self.args.exp.lr_rampup_it, 1e-8), 1.0)
-            )
-            return [optimizer], [scheduler]
+      def warmup_lr_lambda(current_step):
+          warmup_steps = self.args.exp.lr_rampup_it
+          if current_step < warmup_steps:
+              return float(current_step) / float(max(1, warmup_steps))
+          return 1.0  # full lr
 
-        return optimizer
+      scheduler = {
+          "scheduler": torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=warmup_lr_lambda),
+          "interval": "step",  # step-wise update
+          "frequency": 1,
+      }
+
+      return {"optimizer": optimizer, "lr_scheduler": scheduler}
+
 
 
 class AudioDataModule(L.LightningDataModule):

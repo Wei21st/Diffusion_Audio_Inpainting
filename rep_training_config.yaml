@@ -5,7 +5,7 @@ logging:
   save_model: true
   save_interval: 50000
   num_sigma_bins: 20
-  freq_cqt_logging: 100
+  freq_cqt_logging: 10
   print_model_summary: false
   profiling:
     enabled: true
@@ -155,7 +155,7 @@ tester:
 model_dir: experiments/cqt # can change this
 
 exp:
-  exp_name: musicnet44k_4s_Duke
+  exp_name: musicnet44k_4s
   trainer_callable: training.trainer.Trainer
   # model_dir: experiments/cqt  # not nested anymore should be safe to remove
   optimizer:
@@ -167,8 +167,8 @@ exp:
     entity: qiyin # change this to your wandb name or you can just use mine
     project: audio-inpainting-test
   lr: 0.0002
-  lr_rampup_it: 10000
-  scheduler_step_size: 60000
+  lr_rampup_it: 1000 # 10000
+  scheduler_step_size: 5000 # 60000
   scheduler_gamma: 0.8
   batch: 2
   batch_gpu: 2
@@ -184,12 +184,12 @@ exp:
   device: cpu
   use_cqt_DC_correction: false
   ema_rate: 0.9999
-  ema_rampup: 10000
+  ema_rampup: 1000 # 10000
   use_grad_clip: true
   max_grad_norm: 1
   restore: false
   checkpoint_id: null
-  total_iters: 2000
+  total_iters: 10000
   augmentations:
     rev_polarity: true
     pitch_shift:

@@ -381,4 +381,47 @@ def load_state_dict( state_dict, network=None, ema=None, optimizer=None, log=Tru
 
         return False
 
+def compute_LSD(original, reconstructed, win_size=2048, hop_size=512):
+    """
+    Compute Log-Spectral Distance (LSD) between original and reconstructed audio
+    
+    Args:
+        original (torch.Tensor): Original audio signal (B, T)
+        reconstructed (torch.Tensor): Reconstructed audio signal (B, T)
+        win_size (int): STFT window size
+        hop_size (int): STFT hop size
+    
+    Returns:
+        torch.Tensor: LSD value
+    """
+    device = original.device
+    window = torch.hann_window(win_size).to(device)
+    stft_orig = torch.stft(
+        original, 
+        n_fft=win_size, 
+        hop_length=hop_size,
+        window=window,
+        return_complex=True
+    )
+    
+    stft_recon = torch.stft(
+        reconstructed, 
+        n_fft=win_size, 
+        hop_length=hop_size,
+        window=window,
+        return_complex=True
+    )
+    
+    spec_orig = torch.abs(stft_orig)
+    spec_recon = torch.abs(stft_recon)
+    
+    log_spec_orig = torch.log10(spec_orig + 1e-8)
+    log_spec_recon = torch.log10(spec_recon + 1e-8)
+    
+    lsd = torch.mean((log_spec_orig - log_spec_recon) ** 2, dim=1)
+    lsd = torch.sqrt(lsd)
+    
+    lsd = torch.mean(lsd)
+    
+    return lsd
             
