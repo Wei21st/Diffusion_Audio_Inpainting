@@ -150,7 +150,7 @@ class EDM():
     def prepare_train_preconditioning(self, x, sigma):
         #weight=self.lambda_w(sigma)
         #Is calling the denoiser here a good idea? Maybe it would be better to apply directly the preconditioning as in the paper, even though Karras et al seem to do it this way in their code
-        print(x.shape)
+        # print(x.shape)
         noise=self.sample_prior(x.shape,sigma)
 
         cskip=self.cskip(sigma)

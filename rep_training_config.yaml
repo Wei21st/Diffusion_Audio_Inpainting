@@ -1,6 +1,6 @@
 logging:
   log: true
-  log_interval: 1000
+  log_interval: 10
   heavy_log_interval: 50000
   save_model: true
   save_interval: 50000
@@ -27,12 +27,12 @@ logging:
 dset:
   name: musicnet
   callable: datasets.audiofolder.AudioFolderDataset
-  path: G:\\musicNetDataset\\train_data # change this to local path
+  path: /content/backup/data/musicnet_data/musicnet/train_data # G:\\musicNetDataset\\train_data # change this to local path
   test:
     callable: datasets.audiofolder_test.AudioFolderDatasetTest
     num_samples: 4
     batch_size: 1
-    path: G:\\musicNetDataset\\test_data # change this to local path
+    path: /content/backup/data/musicnet_data/musicnet/test_data # G:\\musicNetDataset\\test_data # change this to local path
 
 network:
   name: unet_cqt_oct_with_attention
@@ -170,8 +170,8 @@ exp:
   lr_rampup_it: 10000
   scheduler_step_size: 60000
   scheduler_gamma: 0.8
-  batch: 4
-  batch_gpu: 4
+  batch: 2
+  batch_gpu: 2
   num_accumulation_rounds: 1
   use_fp16: false
   num_workers: 4
@@ -189,7 +189,7 @@ exp:
   max_grad_norm: 1
   restore: false
   checkpoint_id: null
-  total_iters: 500
+  total_iters: 2000
   augmentations:
     rev_polarity: true
     pitch_shift:
