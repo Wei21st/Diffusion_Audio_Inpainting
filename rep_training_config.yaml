@@ -103,6 +103,15 @@ tester:
     smooth: true
     hann_size: 50
   diff_params:
+    schedule_type: power # default is power, can be sigmoid or cosine
+    cosine: # took it from the paper "On the Importance of Noise Scheduling for Diffusion Models"
+      start: 0.2
+      end: 1.0
+      tau: 2.0
+    sigmoid: # also from the same paper
+      start: -3
+      end: 3
+      tau: 0.9
     same_as_training: false
     sigma_data: 0.063
     sigma_min: 1e-4
