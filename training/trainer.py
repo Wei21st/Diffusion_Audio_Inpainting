@@ -1,8 +1,9 @@
 import torch
 import lightning as L
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
 from datasets.audiofolder import AudioFolderDataset
 import torchaudio
+import random
 
 class DiffusionLightningModule(L.LightningModule):
     def __init__(self, args, network, diff_params):
@@ -78,12 +79,19 @@ class AudioDataModule(L.LightningDataModule):
         self.args = args
 
     def setup(self, stage=None):
-        self.train_dataset = AudioFolderDataset(
+        full_dataset = AudioFolderDataset(
             dset_args=self.args.dset,
             fs=self.args.exp.sample_rate * self.args.exp.resample_factor,
             seg_len=self.args.exp.audio_len * self.args.exp.resample_factor,
             overfit=False
         )
+        subset_ratio = getattr(self.args.dset, "subset_ratio", 1.0)
+        if subset_ratio < 1.0:
+            num_samples = int(len(full_dataset) * subset_ratio)
+            indices = random.sample(range(len(full_dataset)), num_samples)
+            self.train_dataset = Subset(full_dataset, indices)
+        else:
+            self.train_dataset = full_dataset
 
     def train_dataloader(self):
         return DataLoader(

@@ -80,9 +80,11 @@ class EDM():
         """
         i=torch.arange(0,nb_steps+1)
         if self.schedule_type == "sigmoid":
+            i = i / nb_steps
             gamma = self._sigmoid_schedule(i)
             t = self.sigma_min + (self.sigma_max - self.sigma_min) * gamma
         elif self.schedule_type == "cosine":
+            i = i / nb_steps
             gamma = self._cosine_schedule(i)
             t = self.sigma_min + (self.sigma_max - self.sigma_min) * gamma
         else:  # Default to power schedule
@@ -107,9 +109,35 @@ class EDM():
         Args:
             N (int): batch size
         """
-        a=torch.rand(N)
-        t=(self.sigma_max**(1/self.ro_train) +a *(self.sigma_min**(1/self.ro_train) - self.sigma_max**(1/self.ro_train)))**self.ro_train
-        return t
+        a = torch.rand(N)
+        if self.schedule_type == "sigmoid":
+            # Use the same sigmoid γ(t) and scale it to [sigma_min, sigma_max]
+            start = self.sigmoid_params["start"]
+            end = self.sigmoid_params["end"]
+            tau = self.sigmoid_params["tau"]
+
+            v_start = 1 / (1 + math.exp(-start / tau))
+            v_end = 1 / (1 + math.exp(-end / tau))
+            gamma = 1 / (1 + torch.exp(-((a * (end - start) + start) / tau)))
+            gamma = (v_end - gamma) / (v_end - v_start)
+            sigma = self.sigma_min + (self.sigma_max - self.sigma_min) * gamma
+
+        elif self.schedule_type == "cosine":
+            # Cosine γ(t), scaled to [sigma_min, sigma_max]
+            start = self.cosine_params["start"]
+            end = self.cosine_params["end"]
+            tau = self.cosine_params["tau"]
+
+            v_start = math.cos(start * math.pi / 2) ** (2 * tau)
+            v_end = math.cos(end * math.pi / 2) ** (2 * tau)
+            gamma = torch.cos((a * (end - start) + start) * math.pi / 2) ** (2 * tau)
+            gamma = (v_end - gamma) / (v_end - v_start)
+            sigma = self.sigma_min + (self.sigma_max - self.sigma_min) * gamma
+        else:  # Default to power-law (ro_train)
+            sigma = (self.sigma_max**(1 / self.ro_train) +
+                    a * (self.sigma_min**(1 / self.ro_train) - self.sigma_max**(1 / self.ro_train)))**self.ro_train
+
+        return sigma
 
     def sample_prior(self,shape,sigma):
         """

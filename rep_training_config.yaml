@@ -18,7 +18,7 @@ logging:
     hop_size: 256
   cqt:
     hop_length: 1024
-    num_octs: 6
+    num_octs: 5
     fmin: 70
     bins_per_oct: 1
   log_feature_stats: true
@@ -28,6 +28,7 @@ dset:
   name: musicnet
   callable: datasets.audiofolder.AudioFolderDataset
   path: /content/backup/data/musicnet_data/musicnet/train_data # G:\\musicNetDataset\\train_data # change this to local path
+  subset_ratio: 0.5
   test:
     callable: datasets.audiofolder_test.AudioFolderDatasetTest
     num_samples: 4
@@ -40,18 +41,18 @@ network:
   use_fencoding: false
   use_norm: true
   filter_out_cqt_DC_Nyq: true
-  depth: 7
-  emb_dim: 256
-  Ns: [64, 96, 96, 128, 128, 256, 256]
-  Ss: [2, 2, 2, 2, 2, 2, 2]
-  num_dils: [2, 3, 4, 5, 6, 7, 7]
-  attention_layers: [0, 0, 0, 0, 1, 1, 1, 1]
+  depth: 5 # 7
+  emb_dim: 128 # 256
+  Ns: [32, 64, 64, 128, 128] # [64, 96, 96, 128, 128, 256, 256]
+  Ss: [2, 2, 2, 2, 2] # [2, 2, 2, 2, 2, 2, 2]
+  num_dils: [2, 3, 4, 5, 6] # [2, 3, 4, 5, 6, 7, 7]
+  attention_layers: [0, 0, 0, 1, 1] # [0, 0, 0, 0, 1, 1, 1, 1]
   bottleneck_type: res_dil_convs
   num_bottleneck_layers: 1
   cqt:
     window: kaiser
     beta: 1
-    num_octs: 7
+    num_octs: 5
     bins_per_oct: 64
   attention_dict:
     num_heads: 8
@@ -66,7 +67,7 @@ network:
 diff_params:
   callable: diff_params.edm.EDM
   diff_params:
-  schedule_type: power # default is power, can be sigmoid or cosine
+  schedule_type: cosine # default is power, can be sigmoid or cosine
   cosine: # took it from the paper "On the Importance of Noise Scheduling for Diffusion Models"
     start: 0.2
     end: 1.0

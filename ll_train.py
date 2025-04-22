@@ -26,7 +26,7 @@ class LossThresholdSaver(Callback):
                 self.checkpoint_callback.on_train_batch_end(trainer, pl_module, outputs, batch, batch_idx)
     
 class LSDLogger(Callback):
-    def __init__(self, log_every_n_steps=10, eval_batch_size=32):
+    def __init__(self, log_every_n_steps=10, eval_batch_size=16):
         super().__init__()
         self.log_every_n_steps = log_every_n_steps
         self.eval_batch_size = eval_batch_size
@@ -92,13 +92,13 @@ def main():
         save_on_train_epoch_end=False,
     )
 
-    loss_filter_cb = LossThresholdSaver(threshold_checkpoint, threshold=0.03)
+    loss_filter_cb = LossThresholdSaver(threshold_checkpoint, threshold=0.01)
     lsd_logger_cb = LSDLogger(log_every_n_steps=10)
 
 
     trainer = LTrainer(
         max_steps=args.exp.total_iters,
-        logger=csv_logger,
+        logger=[csv_logger, tb_logger],
         callbacks=[last_checkpoint, loss_filter_cb, lsd_logger_cb],
         log_every_n_steps=args.logging.log_interval,
         precision="32-true",
