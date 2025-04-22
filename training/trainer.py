@@ -30,6 +30,25 @@ class DiffusionLightningModule(L.LightningModule):
         # print('train_loss_step: ', loss.item())
         current_lr = self.trainer.optimizers[0].param_groups[0]["lr"]
         self.log("lr", current_lr, on_step=True, on_epoch=False, prog_bar=False)
+        
+        sigma_bins = [(0.0, 0.05), (0.05, 0.2), (0.2, 0.5), (0.5, 2.0), (2.0, 5.0), (5.0, 10.0)]
+        sample_loss = error.mean(dim=1)
+        sigma_flat = sigma.view(-1)
+        for start, end in sigma_bins:
+            mask = (sigma_flat >= start) & (sigma_flat < end)
+            if mask.any():
+                binned_loss = error[mask].mean()
+                self.log(f"train_loss_sigma_{start:.2f}_{end:.2f}", binned_loss.item(), on_step=True, on_epoch=False)
+            
+        sigma_data = self.diff_params.sigma_data
+        logsnr = torch.log((sigma_data ** 2) / (sigma ** 2 + 1e-8))
+        avg_logsnr = logsnr.mean()
+        avg_error = error.mean()
+
+        self.log("logsnr", avg_logsnr.item(), on_step=True, on_epoch=False)
+        self.log("logsnr_error", avg_error.item(), on_step=True, on_epoch=False)
+
+
         return loss
 
     # def configure_optimizers(self):

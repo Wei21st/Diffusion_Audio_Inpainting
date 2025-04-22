@@ -26,7 +26,7 @@ class LossThresholdSaver(Callback):
                 self.checkpoint_callback.on_train_batch_end(trainer, pl_module, outputs, batch, batch_idx)
     
 class LSDLogger(Callback):
-    def __init__(self, log_every_n_steps=10, eval_batch_size=16):
+    def __init__(self, log_every_n_steps=10, eval_batch_size=2):
         super().__init__()
         self.log_every_n_steps = log_every_n_steps
         self.eval_batch_size = eval_batch_size
