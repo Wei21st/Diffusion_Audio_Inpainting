@@ -34,9 +34,9 @@ class Linear(torch.nn.Module):
         self.bias = torch.nn.Parameter(weight_init([out_features], **init_kwargs) * init_bias) if bias else None
 
     def forward(self, x):
-        x = x @ self.weight.to(x.dtype).t()
+        x = x @ self.weight.to(dtype=x.dtype, device=x.device).t()
         if self.bias is not None:
-            x = x.add_(self.bias.to(x.dtype))
+            x = x.add_(self.bias.to(dtype=x.dtype, device=x.device))
         return x
 
 class Conv1d(torch.nn.Module):
@@ -53,8 +53,8 @@ class Conv1d(torch.nn.Module):
         self.bias = torch.nn.Parameter(weight_init([out_channels], **init_kwargs) * init_bias) if bias else None
 
     def forward(self, x):
-        w = self.weight.to(x.dtype) if self.weight is not None else None
-        b = self.bias.to(x.dtype) if self.bias is not None else None
+        w = self.weight.to(dtype=x.dtype, device=x.device) if self.weight is not None else None
+        b = self.bias.to(dtype=x.dtype, device=x.device) if self.bias is not None else None
         w_pad = w.shape[-1] // 2 if w is not None else 0
         #f_pad = (f.shape[-1] - 1) // 2 if f is not None else 0
         #print(x.shape, w.shape)
@@ -77,8 +77,8 @@ class Conv2d(torch.nn.Module):
         self.bias = torch.nn.Parameter(weight_init([out_channels], **init_kwargs) * init_bias) if bias else None
 
     def forward(self, x):
-        w = self.weight.to(x.dtype) if self.weight is not None else None
-        b = self.bias.to(x.dtype) if self.bias is not None else None
+        w = self.weight.to(dtype=x.dtype, device=x.device) if self.weight is not None else None
+        b = self.bias.to(dtype=x.dtype, device=x.device) if self.bias is not None else None
         w_pad = w.shape[-1] // 2 if w is not None else 0
         #f_pad = (f.shape[-1] - 1) // 2 if f is not None else 0
         if w is not None:
@@ -160,7 +160,7 @@ class BiasFreeGroupNorm(nn.Module):
         # normalize
         x=einops.rearrange(x, 'n g (gc f t) -> n (g gc) f t', g=self.num_groups, gc=gc, f=F, t=T)
         #x = x.view(N,C,H,W)
-        return x * self.gamma
+        return x * self.gamma.to(dtype=x.dtype, device=x.device)
 
 
 
@@ -205,8 +205,8 @@ class RFF_MLP_Block(nn.Module):
           table:
               (shape: [B, 64], dtype: float32)
         """
-        freqs = self.RFF_freq
-        table = 2 * np.pi * sigma * freqs
+        freqs = self.RFF_freq.to(sigma.device)
+        table = 2 * torch.pi * sigma * freqs
         table = torch.cat([torch.sin(table), torch.cos(table)], dim=1)
         return table
 
@@ -238,7 +238,7 @@ class AddFreqEncodingRFF(nn.Module):
         #freqs = freqs.to(device=torch.device("cuda"))
         freqs=freqs.unsqueeze(-1) # [1, 32, 1]
 
-        self.n=torch.arange(start=0,end=self.f_dim)
+        self.n = torch.arange(start=0,end=self.f_dim, device=self.RFF_freq.device)
         self.n=self.n.unsqueeze(0).unsqueeze(0)  #[1,1,F]
 
         table = 2 * np.pi * self.n * freqs
@@ -255,7 +255,7 @@ class AddFreqEncodingRFF(nn.Module):
         batch_size_tensor = input_tensor.shape[0]  # get batch size
         time_dim = input_tensor.shape[-1]  # get time dimension
 
-        fembeddings_2 = torch.broadcast_to(self.embeddings, [batch_size_tensor, time_dim,self.N*2, self.f_dim])
+        fembeddings_2 = torch.broadcast_to(self.embeddings.to(input_tensor.device), [batch_size_tensor, time_dim,self.N*2, self.f_dim])
         fembeddings_2=fembeddings_2.permute(0,2,3,1)
     
         
@@ -525,22 +525,24 @@ class UpDownResample(nn.Module):
         down=False,
         mode_resample="T", #T for time, F for freq, TF for both
         resample_filter='cubic', 
-        pad_mode='reflect'
+        pad_mode='reflect', 
+        device=torch.device("cuda")
         ):
         super().__init__()
         assert not (up and down) #you cannot upsample and downsample at the same time
         assert up or down #you must upsample or downsample
         self.down=down
         self.up=up
+        self.device = device
         if up or down:
             #upsample block
             self.pad_mode = pad_mode #I think reflect is a goof choice for padding
             self.mode_resample=mode_resample
             if mode_resample=="T":
-                kernel_1d = torch.tensor(_kernels[resample_filter], dtype=torch.float32)
+                kernel_1d = torch.tensor(_kernels[resample_filter], dtype=torch.float32).to(self.device)
             elif mode_resample=="F":
                 #kerel shouuld be the same
-                kernel_1d = torch.tensor(_kernels[resample_filter], dtype=torch.float32)
+                kernel_1d = torch.tensor(_kernels[resample_filter], dtype=torch.float32).to(self.device)
             else:
                 raise NotImplementedError("Only time upsampling is implemented")
                 #TODO implement freq upsampling and downsampling

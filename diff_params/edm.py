@@ -1,5 +1,6 @@
 import torch
 import numpy as np
+import math
 
 import utils.training_utils as utils
 
@@ -16,6 +17,7 @@ class EDM():
             sigma_data (float): 
         """
         self.args=args
+        self.schedule_type = getattr(args.diff_params, "schedule_type", "power")
         self.sigma_min = args.diff_params.sigma_min
         self.sigma_max =args.diff_params.sigma_max
         self.P_mean=args.diff_params.P_mean
@@ -29,10 +31,28 @@ class EDM():
         self.Stmax=args.diff_params.Stmax
         self.Snoise=args.diff_params.Snoise
 
+        self.sigmoid_params = getattr(args.diff_params, "sigmoid", {"start": -3, "end": 3, "tau": 1.0})
+        self.cosine_params = getattr(args.diff_params, "cosine", {"start": 0, "end": 1, "tau": 1.0})
+
         #perceptual filter
         if self.args.diff_params.aweighting.use_aweighting:
             self.AW=utils.FIRFilter(filter_type="aw", fs=args.exp.sample_rate, ntaps=self.args.diff_params.aweighting.ntaps)
 
+    def _sigmoid_schedule(self, t):
+        start, end, tau = self.sigmoid_params["start"], self.sigmoid_params["end"], self.sigmoid_params["tau"]
+        v_start = 1 / (1 + np.exp(-start / tau))
+        v_end = 1 / (1 + np.exp(-end / tau))
+        output = 1 / (1 + torch.exp(-(t * (end - start) + start) / tau))
+        output = (v_end - output) / (v_end - v_start)
+        return output
+
+    def _cosine_schedule(self, t):
+        start, end, tau = self.cosine_params["start"], self.cosine_params["end"], self.cosine_params["tau"]
+        v_start = math.cos(start * math.pi / 2) ** (2 * tau)
+        v_end = math.cos(end * math.pi / 2) ** (2 * tau)
+        output = torch.cos((t * (end - start) + start) * math.pi / 2) ** (2 * tau)
+        output = (v_end - output) / (v_end - v_start)
+        return output
        
 
     def get_gamma(self, t): 
@@ -59,7 +79,16 @@ class EDM():
            nb_steps (int): Number of discretized steps
         """
         i=torch.arange(0,nb_steps+1)
-        t=(self.sigma_max**(1/self.ro) +i/(nb_steps-1) *(self.sigma_min**(1/self.ro) - self.sigma_max**(1/self.ro)))**self.ro
+        if self.schedule_type == "sigmoid":
+            i = i / nb_steps
+            gamma = self._sigmoid_schedule(i)
+            t = self.sigma_min + (self.sigma_max - self.sigma_min) * gamma
+        elif self.schedule_type == "cosine":
+            i = i / nb_steps
+            gamma = self._cosine_schedule(i)
+            t = self.sigma_min + (self.sigma_max - self.sigma_min) * gamma
+        else:  # Default to power schedule
+            t=(self.sigma_max**(1/self.ro) +i/(nb_steps-1) *(self.sigma_min**(1/self.ro) - self.sigma_max**(1/self.ro)))**self.ro
         t[-1]=0
         return t
 
@@ -80,9 +109,35 @@ class EDM():
         Args:
             N (int): batch size
         """
-        a=torch.rand(N)
-        t=(self.sigma_max**(1/self.ro_train) +a *(self.sigma_min**(1/self.ro_train) - self.sigma_max**(1/self.ro_train)))**self.ro_train
-        return t
+        a = torch.rand(N)
+        if self.schedule_type == "sigmoid":
+            # Use the same sigmoid γ(t) and scale it to [sigma_min, sigma_max]
+            start = self.sigmoid_params["start"]
+            end = self.sigmoid_params["end"]
+            tau = self.sigmoid_params["tau"]
+
+            v_start = 1 / (1 + math.exp(-start / tau))
+            v_end = 1 / (1 + math.exp(-end / tau))
+            gamma = 1 / (1 + torch.exp(-((a * (end - start) + start) / tau)))
+            gamma = (v_end - gamma) / (v_end - v_start)
+            sigma = self.sigma_min + (self.sigma_max - self.sigma_min) * gamma
+
+        elif self.schedule_type == "cosine":
+            # Cosine γ(t), scaled to [sigma_min, sigma_max]
+            start = self.cosine_params["start"]
+            end = self.cosine_params["end"]
+            tau = self.cosine_params["tau"]
+
+            v_start = math.cos(start * math.pi / 2) ** (2 * tau)
+            v_end = math.cos(end * math.pi / 2) ** (2 * tau)
+            gamma = torch.cos((a * (end - start) + start) * math.pi / 2) ** (2 * tau)
+            gamma = (v_end - gamma) / (v_end - v_start)
+            sigma = self.sigma_min + (self.sigma_max - self.sigma_min) * gamma
+        else:  # Default to power-law (ro_train)
+            sigma = (self.sigma_max**(1 / self.ro_train) +
+                    a * (self.sigma_min**(1 / self.ro_train) - self.sigma_max**(1 / self.ro_train)))**self.ro_train
+
+        return sigma
 
     def sample_prior(self,shape,sigma):
         """
@@ -150,7 +205,7 @@ class EDM():
     def prepare_train_preconditioning(self, x, sigma):
         #weight=self.lambda_w(sigma)
         #Is calling the denoiser here a good idea? Maybe it would be better to apply directly the preconditioning as in the paper, even though Karras et al seem to do it this way in their code
-        print(x.shape)
+        # print(x.shape)
         noise=self.sample_prior(x.shape,sigma)
 
         cskip=self.cskip(sigma)

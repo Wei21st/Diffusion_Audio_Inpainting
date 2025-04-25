@@ -1,0 +1,212 @@
+logging:
+  log: true
+  log_interval: 10
+  heavy_log_interval: 50000
+  save_model: true
+  save_interval: 50000
+  num_sigma_bins: 20
+  freq_cqt_logging: 10
+  print_model_summary: false
+  profiling:
+    enabled: true
+    wait: 5
+    warmup: 10
+    active: 2
+    repeat: 1
+  stft:
+    win_size: 1024
+    hop_size: 256
+  cqt:
+    hop_length: 1024
+    num_octs: 5
+    fmin: 70
+    bins_per_oct: 1
+  log_feature_stats: true
+  log_feature_stats_interval: 50000
+
+dset:
+  name: musicnet
+  callable: datasets.audiofolder.AudioFolderDataset
+  path: /content/backup/data/musicnet_data/musicnet/train_data # G:\\musicNetDataset\\train_data # change this to local path
+  subset_ratio: 0.5
+  test:
+    callable: datasets.audiofolder_test.AudioFolderDatasetTest
+    num_samples: 4
+    batch_size: 1
+    path: /content/backup/data/musicnet_data/musicnet/test_data # G:\\musicNetDataset\\test_data # change this to local path
+
+network:
+  name: unet_cqt_oct_with_attention
+  callable: networks.unet_cqt_oct_with_projattention_adaLN_2.Unet_CQT_oct_with_attention
+  use_fencoding: false
+  use_norm: true
+  filter_out_cqt_DC_Nyq: true
+  depth: 5 # 7
+  emb_dim: 128 # 256
+  Ns: [32, 64, 64, 128, 128] # [64, 96, 96, 128, 128, 256, 256]
+  Ss: [2, 2, 2, 2, 2] # [2, 2, 2, 2, 2, 2, 2]
+  num_dils: [2, 3, 4, 5, 6] # [2, 3, 4, 5, 6, 7, 7]
+  attention_layers: [0, 0, 0, 1, 1] # [0, 0, 0, 0, 1, 1, 1, 1]
+  bottleneck_type: res_dil_convs
+  num_bottleneck_layers: 1
+  cqt:
+    window: kaiser
+    beta: 1
+    num_octs: 5
+    bins_per_oct: 64
+  attention_dict:
+    num_heads: 8
+    attn_dropout: 0.0
+    bias_qkv: false
+    N: 0
+    rel_pos_num_buckets: 32
+    rel_pos_max_distance: 64
+    use_rel_pos: false
+    Nproj: 8
+
+diff_params:
+  callable: diff_params.edm.EDM
+  diff_params:
+  schedule_type: cosine # default is power, can be sigmoid or cosine
+  cosine: # took it from the paper "On the Importance of Noise Scheduling for Diffusion Models"
+    start: 0.2
+    end: 1.0
+    tau: 2.0
+  sigmoid: # also from the same paper
+    start: -3
+    end: 3
+    tau: 0.9
+  sigma_data: 0.063
+  sigma_min: 1e-5
+  sigma_max: 10
+  P_mean: -1.2
+  P_std: 1.2
+  ro: 13
+  ro_train: 10
+  Schurn: 5
+  Snoise: 1
+  Stmin: 0
+  Stmax: 50
+  aweighting:
+    use_aweighting: false
+    ntaps: 101
+
+tester:
+  do_test: true
+  name: inpainting_tester
+  callable: testing.tester_inpainting.Tester
+  sampler_callable: testing.edm_sampler_inpainting.Sampler
+  modes: ["inpainting"]
+  T: 35
+  order: 2
+  filter_out_cqt_DC_Nyq: true
+  checkpoint: experiments/54/22k_8s-790000.pt
+  unconditional:
+    num_samples: 4
+    audio_len: 184184
+  posterior_sampling:
+    xi: 0.25
+    norm: 2
+    smoothl1_beta: 1
+  data_consistency:
+    use: true
+    type: always
+    smooth: true
+    hann_size: 50
+    same_as_training: false
+    sigma_data: 0.063
+    sigma_min: 1e-4
+    sigma_max: 1
+    P_mean: -1.2
+    P_std: 1.2
+    ro: 13
+    ro_train: 13
+    Schurn: 10
+    Snoise: 1.0
+    Stmin: 0
+    Stmax: 50
+  autoregressive:
+    overlap: 0.25
+    num_samples: 4
+  sampler: stochastic
+  noise_in_observations_SNR: null
+  inpainting:
+    mask_mode: long
+    long:
+      gap_length: 1500
+      start_gap_idx: null
+    short:
+      num_gaps: 4
+      gap_length: 25
+      start_gap_idx: null
+  spectrogram_inpainting:
+    stft:
+      window: hann
+      n_fft: 1024
+      hop_length: 256
+      win_length: 1024
+    time_mask_length: 2000
+    time_start_idx: null
+    min_masked_freq: 300
+    max_masked_freq: 2000
+  STN_inpainting:
+    STN_params:
+      nwin1: 4096
+      G1: 0.65
+      G2: 0.7
+    type: T
+  comp_sens:
+    percentage: 5
+  max_thresh_grads: 1
+  type_spec: linear
+  declipping:
+    SDR: 3
+
+model_dir: experiments/cqt # can change this
+
+exp:
+  exp_name: musicnet44k_4s
+  trainer_callable: training.trainer.Trainer
+  # model_dir: experiments/cqt  # not nested anymore should be safe to remove
+  optimizer:
+    type: adam
+    beta1: 0.9
+    beta2: 0.999
+    eps: 1e-8
+  wandb:
+    entity: qiyin # change this to your wandb name or you can just use mine
+    project: audio-inpainting-test
+  lr: 0.0002
+  lr_rampup_it: 1000 # 10000
+  scheduler_step_size: 5000 # 60000
+  scheduler_gamma: 0.8
+  batch: 2
+  batch_gpu: 2
+  num_accumulation_rounds: 1
+  use_fp16: false
+  num_workers: 4
+  seed: 42
+  resume: true
+  resume_checkpoint: null
+  sample_rate: 44100
+  audio_len: 184184
+  resample_factor: 1
+  device: cpu
+  use_cqt_DC_correction: false
+  ema_rate: 0.9999
+  ema_rampup: 1000 # 10000
+  use_grad_clip: true
+  max_grad_norm: 1
+  restore: false
+  checkpoint_id: null
+  total_iters: 10000
+  augmentations:
+    rev_polarity: true
+    pitch_shift:
+      use: false
+      min_semitones: -6
+      max_semitones: 6
+    gain:
+      use: false
+      min_db: -3
+      max_db: 3
